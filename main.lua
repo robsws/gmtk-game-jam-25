@@ -64,15 +64,31 @@ function HandleBeatGridMouseHover()
 end
 
 function HandleBeatGridMouseClick(mouse_x, mouse_y)
-   local cell_x, cell_y, mouse_in_grid = MouseCoordToGridCoord(mouse_x, mouse_y)
-   if mouse_in_grid then
-	  local is_on = BeatGrid[cell_y][cell_x].on
-	  if is_on then
-		 BeatGrid[cell_y][cell_x].on = false
-	  else
-		 BeatGrid[cell_y][cell_x].on = true
-	  end
+    local cell_x, cell_y, mouse_in_grid = MouseCoordToGridCoord(mouse_x, mouse_y)
+    if mouse_in_grid then
+        local is_on = BeatGrid[cell_y][cell_x].on
+        if is_on then
+            BeatGrid[cell_y][cell_x].on = false
+        else
+            BeatGrid[cell_y][cell_x].on = true
+        end
+    end
+end
+
+function HandleDrumTrigger(dt)
+   -- Only trigger the drum if the bar passed over the threshold
+   -- in this frame.
+   local secs_to_cross_screen = NumBeats / TempoBps
+   local time_bar_percent_this_frame = (Time % secs_to_cross_screen) / secs_to_cross_screen
+   local time_bar_percent_last_frame = ((Time-dt) % secs_to_cross_screen) / secs_to_cross_screen
+   local this_frame_beat = math.floor(time_bar_percent_this_frame * NumBeats)
+   local last_frame_beat = math.floor(time_bar_percent_last_frame * NumBeats)
+   if this_frame_beat == last_frame_beat then
+	  -- beats are the same between frames = don't trigger the drums
+	  return
    end
+   -- sound
+   print("beat")
 end
 
 function DrawGrid()
@@ -137,6 +153,7 @@ function love.update(dt)
    ClearBeatGridHoverState()
    HandleBeatGridMouseHover()
    Time = Time + dt
+   HandleDrumTrigger(dt)
 end
 
 function love.draw()
