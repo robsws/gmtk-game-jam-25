@@ -42,20 +42,34 @@ function ClearBeatGridHoverState()
    end
 end
 
-function HandleBeatGridMouseHover()
-   local mouse_x, mouse_y = love.mouse.getPosition()
+function MouseCoordToGridCoord(mouse_x, mouse_y)
    -- transform mouse position to space in grid
    -- get position relative to grid top left
    local relative_mouse_y = mouse_y - GridTopLeftY
-   -- if relative y is less than 0, it's not in the grid
-   if relative_mouse_y < 0 then
-	  return
-   end
    -- convert x and y to cell coordinates
    local cell_x = math.floor(mouse_x / CellWidth)
    local cell_y = math.floor(relative_mouse_y / CellHeight)
-   if cell_x >= 0 and cell_x < NumCellsX and cell_y >= 0 and cell_y < NumCellsY then
-	  BeatGrid[cell_y][cell_x].hover = true
+   local mouse_in_grid = cell_x >= 0 and cell_x < NumCellsX and cell_y >= 0 and cell_y < NumCellsY
+   return cell_x, cell_y, mouse_in_grid
+end
+
+function HandleBeatGridMouseHover()
+    local mouse_x, mouse_y = love.mouse.getPosition()
+    local cell_x, cell_y, mouse_in_grid = MouseCoordToGridCoord(mouse_x, mouse_y)
+    if mouse_in_grid then
+        BeatGrid[cell_y][cell_x].hover = true
+    end
+end
+
+function HandleBeatGridMouseClick(mouse_x, mouse_y)
+   local cell_x, cell_y, mouse_in_grid = MouseCoordToGridCoord(mouse_x, mouse_y)
+   if mouse_in_grid then
+	  local is_on = BeatGrid[cell_y][cell_x].on
+	  if is_on then
+		 BeatGrid[cell_y][cell_x].on = false
+	  else
+		 BeatGrid[cell_y][cell_x].on = true
+	  end
    end
 end
 
@@ -66,14 +80,28 @@ function DrawGrid()
 			x = cell_x * CellWidth,
 			y = cell_y * CellHeight + GridTopLeftY
 		 }
-		 local fill_type = "line"
+		 local bg_colour = {red = 0, green = 0, blue = 0}
+		 local fg_colour = {red = 1, green = 1, blue = 1}
 		 local cell = BeatGrid[cell_y][cell_x]
-		 if cell.hover or cell.on then
---			print(string.format("%d,%d: %s %s", cell_x, cell_y, cell.hover, cell.on))
-			fill_type = "fill"
+		 if cell.hover then
+			bg_colour = {red = 0.3, green = 0.3, blue = 0.3}
+		 elseif cell.on
+		 then
+			bg_colour = {red = 0, green = 0.8, blue = 0.7}
 		 end
+		 -- background for the cell
+	     love.graphics.setColor(bg_colour.red, bg_colour.green, bg_colour.blue, 1)
 		 love.graphics.rectangle(
-			fill_type,
+			"fill",
+			top_left.x,
+			top_left.y,
+			CellWidth,
+			CellHeight
+		 )
+		 -- outline for the cell
+		 love.graphics.setColor(fg_colour.red, fg_colour.green, fg_colour.blue, 1)
+		 love.graphics.rectangle(
+			"line",
 			top_left.x,
 			top_left.y,
 			CellWidth,
@@ -88,7 +116,6 @@ end
 function love.load()
    ResetWindowGlobals()
    InitBeatGrid()
-   print(BeatGrid)
 end
 
 function love.update(dt)
@@ -99,4 +126,8 @@ end
 
 function love.draw()
    DrawGrid()
+end
+
+function love.mousereleased(x, y, button, istouch, presses)
+   HandleBeatGridMouseClick(x, y)
 end
