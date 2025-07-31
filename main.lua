@@ -6,10 +6,19 @@ NumCellsX = NumBeats
 NumCellsY = NumInstruments
 TempoBps = 2
 
+BASS = 0
+SNARE = 1
+HITOM = 2
+LOTOM = 3
+OHIHAT = 4
+CHIHAT = 5
+CRASH = 6
+
 -- GLOBALS
 
 BeatGrid = {}
 Time = 0
+BeatAudio = {}
 
 function ResetWindowGlobals()
    WinWidth = love.graphics.getWidth()
@@ -22,13 +31,23 @@ end
 
 -- FUNCTIONS
 
--- beat grid
+function LoadAssets()
+   BeatAudio = {
+	  bass = love.audio.newSource("assets/audio/kick-gritty.wav", "static"),
+	  snare = love.audio.newSource("assets/audio/snare-analog.wav", "static"),
+	  hitom = love.audio.newSource("assets/audio/tom-acoustic02.wav", "static"),
+	  lotom = love.audio.newSource("assets/audio/tom-acoustic01.wav", "static"),
+	  ohihat = love.audio.newSource("assets/audio/hihat-dist02.wav", "static"),
+	  chihat = love.audio.newSource("assets/audio/hihat-plain.wav", "static"),
+	  crash = love.audio.newSource("assets/audio/crash-acoustic.wav", "static")
+   }
+end
 
 function InitBeatGrid()
-   for cell_y=0,NumInstruments do
-	  BeatGrid[cell_y] = {}
-	  for cell_x=0,NumBeats do
-		 BeatGrid[cell_y][cell_x] = {
+   for cell_x = 0,NumBeats do
+	  BeatGrid[cell_x] = {}
+	  for cell_y = 0,NumInstruments do
+		 BeatGrid[cell_x][cell_y] = {
 			hover = false,
 			on = false
 		 }
@@ -39,7 +58,7 @@ end
 function ClearBeatGridHoverState()
    for cell_y=0,NumInstruments do
 	  for cell_x=0,NumBeats do
-		 BeatGrid[cell_y][cell_x].hover = false
+		 BeatGrid[cell_x][cell_y].hover = false
 	  end
    end
 end
@@ -59,18 +78,18 @@ function HandleBeatGridMouseHover()
     local mouse_x, mouse_y = love.mouse.getPosition()
     local cell_x, cell_y, mouse_in_grid = MouseCoordToGridCoord(mouse_x, mouse_y)
     if mouse_in_grid then
-        BeatGrid[cell_y][cell_x].hover = true
+        BeatGrid[cell_x][cell_y].hover = true
     end
 end
 
 function HandleBeatGridMouseClick(mouse_x, mouse_y)
     local cell_x, cell_y, mouse_in_grid = MouseCoordToGridCoord(mouse_x, mouse_y)
     if mouse_in_grid then
-        local is_on = BeatGrid[cell_y][cell_x].on
+        local is_on = BeatGrid[cell_x][cell_y].on
         if is_on then
-            BeatGrid[cell_y][cell_x].on = false
+            BeatGrid[cell_x][cell_y].on = false
         else
-            BeatGrid[cell_y][cell_x].on = true
+            BeatGrid[cell_x][cell_y].on = true
         end
     end
 end
@@ -87,8 +106,29 @@ function HandleDrumTrigger(dt)
 	  -- beats are the same between frames = don't trigger the drums
 	  return
    end
-   -- sound
-   print("beat")
+   -- figure out which drums should sound
+   local instruments = BeatGrid[this_frame_beat]
+   if instruments[BASS].on then
+	  BeatAudio.bass:play()
+   end
+   if instruments[SNARE].on then
+	  BeatAudio.snare:play()
+   end
+   if instruments[HITOM].on then
+	  BeatAudio.hitom:play()
+   end
+   if instruments[LOTOM].on then
+	  BeatAudio.lotom:play()
+   end
+   if instruments[OHIHAT].on then
+	  BeatAudio.ohihat:play()
+   end
+   if instruments[CHIHAT].on then
+	  BeatAudio.chihat:play()
+   end
+   if instruments[CRASH].on then
+	  BeatAudio.crash:play()
+   end
 end
 
 function DrawGrid()
@@ -100,7 +140,7 @@ function DrawGrid()
             }
             local bg_colour = { red = 0, green = 0, blue = 0 }
             local fg_colour = { red = 1, green = 1, blue = 1 }
-            local cell = BeatGrid[cell_y][cell_x]
+            local cell = BeatGrid[cell_x][cell_y]
             if cell.hover then
                 bg_colour = { red = 0.3, green = 0.3, blue = 0.3 }
             elseif cell.on
@@ -144,6 +184,7 @@ end
 -- CALLBACKS
 
 function love.load()
+   LoadAssets()
    ResetWindowGlobals()
    InitBeatGrid()
 end
