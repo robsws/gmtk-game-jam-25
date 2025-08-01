@@ -21,12 +21,67 @@ Time = 0
 BeatAudio = {}
 
 function ResetWindowGlobals()
-   WinWidth = love.graphics.getWidth()
-   WinHeight = love.graphics.getHeight()
-   GridHeight = WinHeight / 5
-   GridTopLeftY = GridHeight * 4
-   CellWidth = WinWidth / NumCellsX
-   CellHeight = GridHeight / NumCellsY
+    WinWidth = love.graphics.getWidth()
+    WinHeight = love.graphics.getHeight()
+    GridHeight = WinHeight / 5
+    GridTopLeftY = GridHeight * 4
+    CellWidth = WinWidth / NumCellsX
+    CellHeight = GridHeight / NumCellsY
+end
+
+function InitDrums()
+   BassDrum = {
+        x = WinWidth / 2,
+        y = WinHeight * 0.7,
+        force = 3,
+		time_since_hit = 999
+    }
+    SnareDrum = {
+        x = WinWidth / 2,
+        y = WinHeight * 0.4,
+        force = 2,
+		time_since_hit = 999
+    }
+    HiTomDrum = {
+        x = WinWidth / 5,
+        y = WinHeight * 0.7,
+        force = 2,
+		time_since_hit = 999
+    }
+    LoTomDrum = {
+        x = WinWidth - WinWidth / 5,
+        y = WinHeight * 0.7,
+        force = 2,
+		time_since_hit = 999
+    }
+    OpenHiHatDrum = {
+        x = WinWidth / 5,
+        y = WinHeight * 0.4,
+        force = 1,
+		time_since_hit = 999
+    }
+    ClosedHiHatDrum = {
+        x = WinWidth - WinWidth / 5,
+        y = WinHeight * 0.4,
+        force = 1,
+		time_since_hit = 999
+    }
+    CrashDrum = {
+        x = WinWidth / 2,
+        y = WinHeight * 0.4,
+        force = 4,
+		time_since_hit = 999
+    }
+end
+
+function UpdateDrums(dt)
+   BassDrum.time_since_hit = BassDrum.time_since_hit + dt
+   SnareDrum.time_since_hit = SnareDrum.time_since_hit + dt
+   LoTomDrum.time_since_hit = LoTomDrum.time_since_hit + dt
+   HiTomDrum.time_since_hit = HiTomDrum.time_since_hit + dt
+   OpenHiHatDrum.time_since_hit = OpenHiHatDrum.time_since_hit + dt
+   ClosedHiHatDrum.time_since_hit = ClosedHiHatDrum.time_since_hit + dt
+   CrashDrum.time_since_hit = CrashDrum.time_since_hit + dt
 end
 
 -- FUNCTIONS
@@ -66,7 +121,7 @@ function InitWalls()
    local top_wall_height = 50
    local top_wall_width = WinWidth/2 - 20
    local bot_wall_height = 50
-   local bot_wall_width = WinWidth/2 - 40
+   local bot_wall_width = WinWidth/2 - 80
    -- left and right straight walls
    table.insert(
 	  Objects.walls,
@@ -115,14 +170,14 @@ function InitWalls()
 	  Objects.walls,
 	  InitTriangleWall(
 		 side_wall_width, WinHeight*0.8 - bot_wall_height,
-		 side_wall_width, WinHeight*0.8 - 2 * bot_wall_height,
+		 side_wall_width, WinHeight*0.8 - 3 * bot_wall_height,
 		 bot_wall_width, WinHeight*0.8 - bot_wall_height))
    table.insert(
 	  Objects.walls,
 	  InitTriangleWall(
 		 WinWidth - side_wall_width, WinHeight*0.8 - bot_wall_height,
-		 WinWidth - side_wall_width, WinHeight*0.8 - 2 * bot_wall_height,
-		 WinWidth - bot_wall_width, WinHeight*0.8 - bot_wall_height))
+		 WinWidth - side_wall_width, WinHeight*0.8 - 3 * bot_wall_height,
+		 WinWidth - bot_wall_width, WinHeight * 0.8 - bot_wall_height))
 end
 
 function InitRectangleWall(x, y, w, h)
@@ -202,6 +257,36 @@ function HandleBeatGridMouseClick(mouse_x, mouse_y)
     end
 end
 
+function UpdateBall()
+    -- if the ball drops off the bottom, put it back at the top
+    if Objects.ball.body:getY() > WinHeight * 0.8 then
+	   Objects.ball.body:release()
+	   InitBall()
+    end
+end
+
+function ActivateDrum(drum)
+   drum.time_since_hit = 0
+   -- drums don't affect balls below them
+   if Objects.ball.body:getY() < drum.y then
+	  return
+   end
+   -- work out how close the ball is to the drum point
+   local vec = {
+	  Objects.ball.body:getX() - drum.x,
+	  Objects.ball.body:getY() - drum.y
+   }
+   local mag = math.sqrt(vec[1] ^ 2 + vec[2] ^ 2)
+   local unit_vec = {
+	  vec[1] / mag,
+	  vec[2] / mag
+   }
+   -- work out the force - should be inverse square of distance
+   local force = 1/(mag^2) * drum.force * 1000
+   -- apply the force in a direction away from the drum
+   Objects.ball.body:applyLinearImpulse(unit_vec[1] * force, unit_vec[2] * force)
+end
+
 function HandleDrumTrigger(dt)
    -- Only trigger the drum if the bar passed over the threshold
    -- in this frame.
@@ -216,26 +301,41 @@ function HandleDrumTrigger(dt)
    end
    -- figure out which drums should sound
    local instruments = BeatGrid[this_frame_beat]
+
    if instruments[BASS].on then
+	  BeatAudio.bass:stop()
 	  BeatAudio.bass:play()
+	  ActivateDrum(BassDrum)
    end
    if instruments[SNARE].on then
+	  BeatAudio.snare:stop()
 	  BeatAudio.snare:play()
+	  ActivateDrum(SnareDrum)
    end
    if instruments[HITOM].on then
+	  BeatAudio.hitom:stop()
 	  BeatAudio.hitom:play()
+	  ActivateDrum(HiTomDrum)
    end
    if instruments[LOTOM].on then
+	  BeatAudio.lotom:stop()
 	  BeatAudio.lotom:play()
+	  ActivateDrum(LoTomDrum)
    end
    if instruments[OHIHAT].on then
+	  BeatAudio.ohihat:stop()
 	  BeatAudio.ohihat:play()
+	  ActivateDrum(OpenHiHatDrum)
    end
    if instruments[CHIHAT].on then
+	  BeatAudio.chihat:stop()
 	  BeatAudio.chihat:play()
+	  ActivateDrum(ClosedHiHatDrum)
    end
    if instruments[CRASH].on then
+	  BeatAudio.crash:stop()
 	  BeatAudio.crash:play()
+	  ActivateDrum(CrashDrum)
    end
 end
 
@@ -300,13 +400,38 @@ function DrawBall()
 end
 
 function DrawWalls()
-   for i, wall in ipairs(Objects.walls) do
-	  love.graphics.setColor(0.5, 0.5, 0.8)
-	  love.graphics.polygon(
-		 "fill",
-		 wall.body:getWorldPoints(wall.shape:getPoints())
-	  )
+    love.graphics.setColor(0.5, 0.5, 0.8)
+    for i, wall in ipairs(Objects.walls) do
+        love.graphics.polygon(
+            "fill",
+            wall.body:getWorldPoints(wall.shape:getPoints())
+        )
+    end
+end
+
+function DrawDrum(drum)
+   local max_time = (NumBeats / TempoBps) / (NumBeats/4) -- 4 beats
+   local diminish_factor = (max_time - drum.time_since_hit) / max_time
+   if diminish_factor < 0 then
+	  return
    end
+   love.graphics.setColor(1, 0, 0, diminish_factor)
+   love.graphics.circle(
+	  "fill",
+	  drum.x,
+	  drum.y,
+	  drum.force * 20 * diminish_factor
+   )
+end
+
+function DrawDrums()
+    DrawDrum(BassDrum)
+    DrawDrum(SnareDrum)
+    DrawDrum(LoTomDrum)
+    DrawDrum(HiTomDrum)
+    DrawDrum(OpenHiHatDrum)
+    DrawDrum(ClosedHiHatDrum)
+    DrawDrum(CrashDrum)
 end
 
 -- CALLBACKS
@@ -315,6 +440,7 @@ function love.load()
    LoadAssets()
    love.window.setMode(650, 1000)
    ResetWindowGlobals()
+   InitDrums()
    InitBeatGrid()
    InitPhysics()
 end
@@ -324,8 +450,10 @@ function love.update(dt)
    ClearBeatGridHoverState()
    HandleBeatGridMouseHover()
    Time = Time + dt
+   UpdateDrums(dt)
    HandleDrumTrigger(dt)
    World:update(dt)
+   UpdateBall()
 end
 
 function love.draw()
@@ -333,6 +461,7 @@ function love.draw()
    DrawTimeBar()
    DrawBall()
    DrawWalls()
+   DrawDrums()
 end
 
 function love.mousereleased(x, y, button, istouch, presses)
