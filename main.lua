@@ -86,7 +86,7 @@ function InitDrums()
     CrashDrum = {
         name = "crash",
         x = WinWidth / 2,
-        y = WinHeight * 0.4,
+        y = WinHeight * 0.8,
         time_since_hit = 999
     }
 end
@@ -345,13 +345,11 @@ function ApplyBassDrumForce(x, y)
         vec[1] / mag,
         vec[2] / mag
     }
-    LogNums("bass unit_vec: (%f,%f) mag: %f", unit_vec[1], unit_vec[2], mag)
     -- work out the force
     local max_force = 75
     local cutoff_percent = 0.2
     local dist_ratio = math.min(1, mag / (WinHeight * cutoff_percent))
     local force_mag = math.max(0, max_force * (1 - dist_ratio))
-    LogNums("bass dist_ratio: %f, force_mag: %f", dist_ratio, force_mag)
     local force_vec = {
         unit_vec[1] * force_mag,
         unit_vec[2] * force_mag
@@ -368,7 +366,7 @@ function ApplyTomDrumForce(x)
     if ball_y < TopWallHeight then
         return
     end
-    local dist = Objects.ball.body:getX() - x
+    local dist = ball_x - x
     local mag = math.abs(dist)
     local dir = dist / mag
     -- work out the force - should linearly drop
@@ -376,7 +374,7 @@ function ApplyTomDrumForce(x)
     -- will cut off to 0 at 70% of screen width
     local cutoff_percent = 0.7
     -- distance as a percentage of 70% of the screen
-    local dist_ratio = math.min(1, mag / (WinHeight * cutoff_percent))
+    local dist_ratio = math.min(1, mag / (WinWidth * cutoff_percent))
     -- force scales inversely with the distance
     local force = math.max(0, max_force * (1 - dist_ratio)) * dir
     -- apply the force
@@ -449,6 +447,29 @@ function ApplyRightHiHat()
     )
 end
 
+function ApplyCrashDrumForce(y)
+    local ball_y = Objects.ball.body:getY()
+    -- only apply force if the ball is out of the top spout
+    if ball_y < TopWallHeight then
+        return
+    end
+    local dist = ball_y - y
+    local mag = math.abs(dist)
+    local dir = -1
+    -- work out the force - should linearly drop
+    local max_force = 50
+    -- will cut off to 0 at 70% of screen width
+    local cutoff_percent = 0.5
+    -- distance as a percentage of 70% of the screen
+    local dist_ratio = math.min(1, mag / (WinHeight * 0.8 * cutoff_percent))
+    LogNums("crash | ball_y: %f | dist_ratio: %f", ball_y, dist_ratio)
+    -- force scales inversely with the distance
+    local force = math.max(0, max_force * (1 - dist_ratio)) * dir
+    -- apply the force
+    LogNums("crash: %f (0, %f)", y, force)
+    Objects.ball.body:applyLinearImpulse(0, force)
+end
+
 function ActivateDrum(drum)
     drum.time_since_hit = 0
     if drum.name == "bass" then
@@ -461,6 +482,8 @@ function ActivateDrum(drum)
         ApplyLeftHiHat()
     elseif drum.name == "chihat" then
         ApplyRightHiHat()
+    elseif drum.name == "crash" then
+        ApplyCrashDrumForce(drum.y)
     end
 end
 
@@ -674,6 +697,54 @@ function DrawHiHats()
     )
 end
 
+function RainbowCycle(t)
+    local colour = { r = 0, g = 0, b = 0 }
+    if t <= 1 / 6 then
+        colour.r = 1
+        colour.g = t * 6
+        colour.b = 0
+    elseif t <= 2 / 6 then
+        colour.r = 1 - ((t - 1 / 6) * 6)
+        colour.g = 1
+        colour.b = 0
+    elseif t <= 3 / 6 then
+        colour.r = 0
+        colour.g = 1
+        colour.b = (t - 2 / 6) * 6
+    elseif t <= 4 / 6 then
+        colour.r = 0
+        colour.g = 1 - ((t - 3 / 6) * 6)
+        colour.b = 1
+    elseif t <= 5 / 6 then
+        colour.r = (t - 4 / 6) * 6
+        colour.g = 0
+        colour.b = 1
+    else
+        colour.r = 1
+        colour.g = 0
+        colour.b = 1 - ((t - 5 / 6) * 6)
+    end
+    return colour
+end
+
+function DrawCrashDrumEffect()
+    local max_time = (NumBeats / TempoBps) / (NumBeats / 8) -- 8 beats
+    local diminish_factor = (max_time - CrashDrum.time_since_hit) / max_time
+    if diminish_factor < 0 then
+        return
+    end
+    local colour = RainbowCycle((diminish_factor*2) % 1)
+    love.graphics.setColor(colour.r/2, colour.g/2, colour.b/2, diminish_factor)
+    local bar_height = BotWallHeight * 2 + (1 - diminish_factor) * WinHeight * 0.5
+    love.graphics.rectangle(
+        "fill",
+        0,
+        WinHeight*0.8 - bar_height,
+        WinWidth,
+        bar_height
+    )
+end
+
 -- CALLBACKS
 
 function love.load()
@@ -704,6 +775,7 @@ function love.draw()
     DrawSnareDrumEffect()
     DrawLeftTomDrumEffect()
     DrawRightTomDrumEffect()
+    DrawCrashDrumEffect()
     DrawWalls()
     DrawHiHats()
 end
