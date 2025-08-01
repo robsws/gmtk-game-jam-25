@@ -24,6 +24,14 @@ function LogNums(text, ...)
     print(string.format(text, ...))
 end
 
+function Empty(tab)
+    return next(tab) == nil
+end
+
+function DestroyPhysicsObject(obj)
+   obj.body:destroy()
+end
+
 function ResetWindowGlobals()
     WinWidth = love.graphics.getWidth()
     WinHeight = love.graphics.getHeight()
@@ -43,7 +51,7 @@ function InitDrums()
    SnareDrum = {
 	  name = "snare",
 	  x = WinWidth / 2,
-	  y = WinHeight * 0.4,
+	  y = WinHeight * 0.75,
 	  time_since_hit = 999
    }
    HiTomDrum = {
@@ -107,7 +115,8 @@ function InitPhysics()
     World = love.physics.newWorld(0, 6 * 64, true)
     Objects = {}
     InitBall()
-	InitWalls()
+    InitWalls()
+	Objects.snare = {}
 end
 
 function InitBall()
@@ -268,9 +277,9 @@ function UpdateBall()
             Objects.ball.body:getY() < 0 or
             Objects.ball.body:getX() < 0 or
             Objects.ball.body:getX() > WinWidth
-        ) then
-        Objects.ball.body:release()
-        InitBall()
+	) then
+	   DestroyPhysicsObject(Objects.ball)
+	   InitBall()
     end
 end
 
@@ -301,28 +310,36 @@ function ApplyBassDrumForce(x, y)
 end
 
 function ApplyTomDrumForce(x)
-   local ball_x = Objects.ball.body:getX()
-   local ball_y = Objects.ball.body:getY()
-   -- only apply force if the ball is out of the top spout
-   if ball_y < top_wall_height then
-	  return
-   end
-   local dist = Objects.ball.body:getX() - x
-   local mag = math.abs(dist)
-   local dir = dist / mag
-   -- work out the force - should linearly drop
-   local max_force = 25
-   -- will cut off to 0 at 70% of screen width
-   local cutoff_percent = 0.7
-   -- distance as a percentage of 70% of the screen
-   local dist_ratio = math.min(1, mag / (WinHeight * cutoff_percent))
-   -- force scales inversely with the distance
-   local force = math.max(0, max_force * (1 - dist_ratio)) * dir
-   -- apply the force
-   LogNums("tom: (%d, 0)", force)
-   Objects.ball.body:applyLinearImpulse(force, 0)
+    local ball_x = Objects.ball.body:getX()
+    local ball_y = Objects.ball.body:getY()
+    -- only apply force if the ball is out of the top spout
+    if ball_y < top_wall_height then
+        return
+    end
+    local dist = Objects.ball.body:getX() - x
+    local mag = math.abs(dist)
+    local dir = dist / mag
+    -- work out the force - should linearly drop
+    local max_force = 25
+    -- will cut off to 0 at 70% of screen width
+    local cutoff_percent = 0.7
+    -- distance as a percentage of 70% of the screen
+    local dist_ratio = math.min(1, mag / (WinHeight * cutoff_percent))
+    -- force scales inversely with the distance
+    local force = math.max(0, max_force * (1 - dist_ratio)) * dir
+    -- apply the force
+    LogNums("tom: %f (%f, 0)", x, force)
+    Objects.ball.body:applyLinearImpulse(force, 0)
 end
 
+function ApplySnareDrum(x, y)
+    -- snare drum is a solid circle at the gutter
+    -- that lasts for one beat
+    Objects.snare = {}
+    Objects.snare.body = love.physics.newBody(World, x, y)
+    Objects.snare.shape = love.physics.newCircleShape(30)
+    Objects.snare.fixture = love.physics.newFixture(Objects.snare.body, Objects.snare.shape, 1)
+end
 
 function ActivateDrum(drum)
    drum.time_since_hit = 0
@@ -330,6 +347,8 @@ function ActivateDrum(drum)
 	  ApplyBassDrumForce(drum.x, drum.y)
    elseif drum.name == "lotom" or drum.name == "hitom" then
 	  ApplyTomDrumForce(drum.x)
+   elseif drum.name == "snare" then
+	  ApplySnareDrum(drum.x, drum.y)
    end
 end
 
@@ -345,6 +364,11 @@ function HandleDrumTrigger(dt)
 	  -- beats are the same between frames = don't trigger the drums
 	  return
    end
+   -- kill the snare drum if it was active
+   if not(Empty(Objects.snare)) then
+	  DestroyPhysicsObject(Objects.snare)
+	  Objects.snare = {}
+   end
    -- figure out which drums should sound
    local instruments = BeatGrid[this_frame_beat]
 
@@ -359,11 +383,13 @@ function HandleDrumTrigger(dt)
 	  ActivateDrum(SnareDrum)
    end
    if instruments[HITOM].on then
+	  print("hitom")
 	  BeatAudio.hitom:stop()
 	  BeatAudio.hitom:play()
 	  ActivateDrum(HiTomDrum)
    end
    if instruments[LOTOM].on then
+	  print("lotom")
 	  BeatAudio.lotom:stop()
 	  BeatAudio.lotom:play()
 	  ActivateDrum(LoTomDrum)
@@ -455,30 +481,73 @@ function DrawWalls()
     end
 end
 
-function DrawDrum(drum)
-   local max_time = (NumBeats / TempoBps) / (NumBeats/4) -- 4 beats
-   local diminish_factor = (max_time - drum.time_since_hit) / max_time
+function DrawBassDrumEffect()
+    local max_time = (NumBeats / TempoBps) / (NumBeats / 4) -- 4 beats
+    local diminish_factor = (max_time - BassDrum.time_since_hit) / max_time
+    if diminish_factor < 0 then
+        return
+    end
+    love.graphics.setColor(1, 0, 0, diminish_factor)
+    love.graphics.circle(
+        "fill",
+        BassDrum.x,
+        BassDrum.y,
+        100 * diminish_factor
+    )
+end
+
+function DrawSnareDrumEffect()
+   if Empty(Objects.snare) then
+	  return
+   end
+   local max_time = (NumBeats / TempoBps) / NumBeats -- 1 beats
+   local diminish_factor = (max_time - SnareDrum.time_since_hit) / max_time
    if diminish_factor < 0 then
 	  return
    end
-   love.graphics.setColor(1, 0, 0, diminish_factor)
+   love.graphics.setColor(1, 0.64, 0, diminish_factor)
    love.graphics.circle(
 	  "fill",
-	  drum.x,
-	  drum.y,
-	  100 * diminish_factor
+	  Objects.snare.body:getX(),
+	  Objects.snare.body:getY(),
+	  Objects.snare.shape:getRadius()
    )
 end
 
-function DrawDrums()
-    DrawDrum(BassDrum)
-    DrawDrum(SnareDrum)
-    DrawDrum(LoTomDrum)
-    DrawDrum(HiTomDrum)
-    DrawDrum(OpenHiHatDrum)
-    DrawDrum(ClosedHiHatDrum)
-    DrawDrum(CrashDrum)
+function DrawLeftTomDrumEffect()
+    local max_time = (NumBeats / TempoBps) / (NumBeats / 4) -- 4 beats
+    local diminish_factor = (max_time - HiTomDrum.time_since_hit) / max_time
+    if diminish_factor < 0 then
+        return
+    end
+    love.graphics.setColor(1, 1, 0, diminish_factor)
+	local bar_width = side_wall_width*2 + (1 - diminish_factor) * WinWidth*0.4
+    love.graphics.rectangle(
+	   "fill",
+	   0,
+	   0,
+	   bar_width,
+	   WinHeight*0.8
+	)
 end
+
+function DrawRightTomDrumEffect(drum)
+    local max_time = (NumBeats / TempoBps) / (NumBeats / 4) -- 4 beats
+    local diminish_factor = (max_time - LoTomDrum.time_since_hit) / max_time
+    if diminish_factor < 0 then
+        return
+    end
+    love.graphics.setColor(1, 1, 0, diminish_factor)
+	local bar_width = side_wall_width*2 + (1 - diminish_factor) * WinWidth*0.4
+    love.graphics.rectangle(
+	   "fill",
+	   WinWidth - bar_width,
+	   0,
+	   bar_width,
+	   WinHeight*0.8
+	)
+end
+
 
 -- CALLBACKS
 
@@ -506,8 +575,11 @@ function love.draw()
    DrawGrid()
    DrawTimeBar()
    DrawBall()
+   DrawBassDrumEffect()
+   DrawSnareDrumEffect()
+   DrawLeftTomDrumEffect()
+   DrawRightTomDrumEffect()
    DrawWalls()
-   DrawDrums()
 end
 
 function love.mousereleased(x, y, button, istouch, presses)
