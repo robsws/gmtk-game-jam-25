@@ -20,6 +20,10 @@ BeatGrid = {}
 Time = 0
 BeatAudio = {}
 
+function LogNums(text, ...)
+    print(string.format(text, ...))
+end
+
 function ResetWindowGlobals()
     WinWidth = love.graphics.getWidth()
     WinHeight = love.graphics.getHeight()
@@ -31,47 +35,54 @@ end
 
 function InitDrums()
    BassDrum = {
-        x = WinWidth / 2,
-        y = WinHeight * 0.7,
-        force = 3,
-		time_since_hit = 999
-    }
-    SnareDrum = {
-        x = WinWidth / 2,
-        y = WinHeight * 0.4,
-        force = 2,
-		time_since_hit = 999
-    }
-    HiTomDrum = {
-        x = WinWidth / 5,
-        y = WinHeight * 0.7,
-        force = 2,
-		time_since_hit = 999
-    }
-    LoTomDrum = {
-        x = WinWidth - WinWidth / 5,
-        y = WinHeight * 0.7,
-        force = 2,
-		time_since_hit = 999
-    }
-    OpenHiHatDrum = {
-        x = WinWidth / 5,
-        y = WinHeight * 0.4,
-        force = 1,
-		time_since_hit = 999
-    }
-    ClosedHiHatDrum = {
-        x = WinWidth - WinWidth / 5,
-        y = WinHeight * 0.4,
-        force = 1,
-		time_since_hit = 999
-    }
-    CrashDrum = {
-        x = WinWidth / 2,
-        y = WinHeight * 0.4,
-        force = 4,
-		time_since_hit = 999
-    }
+	  name = "bass",
+	  x = WinWidth / 2,
+	  y = WinHeight * 0.7,
+	  force = 3,
+	  time_since_hit = 999
+   }
+   SnareDrum = {
+	  name = "snare",
+	  x = WinWidth / 2,
+	  y = WinHeight * 0.4,
+	  force = 2,
+	  time_since_hit = 999
+   }
+   HiTomDrum = {
+	  name = "hitom",
+	  x = WinWidth / 7,
+	  y = WinHeight * 0.4,
+	  force = 2,
+	  time_since_hit = 999
+   }
+   LoTomDrum = {
+	  name = "lotom",
+	  x = WinWidth - WinWidth / 7,
+	  y = WinHeight * 0.4,
+	  force = 2,
+	  time_since_hit = 999
+   }
+   OpenHiHatDrum = {
+	  name = "ohihat",
+	  x = WinWidth / 5,
+	  y = WinHeight * 0.4,
+	  force = 1,
+	  time_since_hit = 999
+   }
+   ClosedHiHatDrum = {
+	  name = "chihat",
+	  x = WinWidth - WinWidth / 5,
+	  y = WinHeight * 0.4,
+	  force = 1,
+	  time_since_hit = 999
+   }
+   CrashDrum = {
+	  name = "crash",
+	  x = WinWidth / 2,
+	  y = WinHeight * 0.4,
+	  force = 4,
+	  time_since_hit = 999
+   }
 end
 
 function UpdateDrums(dt)
@@ -117,11 +128,11 @@ end
 
 function InitWalls()
    Objects.walls = {}
-   local side_wall_width = 50
-   local top_wall_height = 50
-   local top_wall_width = WinWidth/2 - 20
-   local bot_wall_height = 50
-   local bot_wall_width = WinWidth/2 - 80
+   side_wall_width = 50
+   top_wall_height = 50
+   top_wall_width = WinWidth/2 - 20
+   bot_wall_height = 50
+   bot_wall_width = WinWidth/2 - 80
    -- left and right straight walls
    table.insert(
 	  Objects.walls,
@@ -259,22 +270,21 @@ end
 
 function UpdateBall()
     -- if the ball drops off the bottom, put it back at the top
-    if Objects.ball.body:getY() > WinHeight * 0.8 then
-	   Objects.ball.body:release()
-	   InitBall()
+    if (
+            Objects.ball.body:getY() > WinHeight * 0.8 or
+            Objects.ball.body:getY() < 0 or
+            Objects.ball.body:getX() < 0 or
+            Objects.ball.body:getX() > WinWidth
+        ) then
+        Objects.ball.body:release()
+        InitBall()
     end
 end
 
-function ActivateDrum(drum)
-   drum.time_since_hit = 0
-   -- drums don't affect balls below them
-   if Objects.ball.body:getY() < drum.y then
-	  return
-   end
-   -- work out how close the ball is to the drum point
+function ApplyForcePushAway(x, y, force_mult)
    local vec = {
-	  Objects.ball.body:getX() - drum.x,
-	  Objects.ball.body:getY() - drum.y
+	  Objects.ball.body:getX() - x,
+	  Objects.ball.body:getY() - y
    }
    local mag = math.sqrt(vec[1] ^ 2 + vec[2] ^ 2)
    local unit_vec = {
@@ -282,9 +292,40 @@ function ActivateDrum(drum)
 	  vec[2] / mag
    }
    -- work out the force - should be inverse square of distance
-   local force = 1/(mag^2) * drum.force * 1000
+   local force = math.min(1/(mag^2) * force_mult, 100)
    -- apply the force in a direction away from the drum
+   LogNums("force vec: (%d, %d)", unit_vec[1] * force, unit_vec[2] * force)
    Objects.ball.body:applyLinearImpulse(unit_vec[1] * force, unit_vec[2] * force)
+end
+
+function ApplyForcePushHorizontal(x)
+   local ball_x = Objects.ball.body:getX()
+   local ball_y = Objects.ball.body:getY()
+   -- only apply force if the ball is out of the top spout
+   if ball_y < top_wall_height then
+	  return
+   end
+   local dist = Objects.ball.body:getX() - x
+   local dir = dist / math.abs(dist)
+   -- work out the force - should linearly drop
+   local max_force = 50
+   -- will cut off to 0 at 70% of screen width
+   local cutoff_percent = 0.7
+   -- distance as a percentage of 70% of the screen
+   local dist_ratio = dist / (WinWidth * cutoff_percent)
+   -- force scales inversely with the distance
+   local force = math.max(0, max_force * (1 - dist_ratio)) * dir
+   -- apply the force
+   LogNums("apply horiz force: %d", force)
+   Objects.ball.body:applyLinearImpulse(force, 0)
+end
+
+
+function ActivateDrum(drum)
+   drum.time_since_hit = 0
+   if drum.name == "lotom" or drum.name == "hitom" then
+	  ApplyForcePushHorizontal(drum.x)
+   end
 end
 
 function HandleDrumTrigger(dt)
