@@ -51,44 +51,59 @@ function InitDrums()
         name = "bass",
         x = WinWidth / 2,
         y = WinHeight * 0.75,
-        time_since_hit = 999
+        time_since_hit = 999,
+        colour = { r = 1, g = 0, b = 0 }
     }
     SnareDrum = {
         name = "snare",
         x = WinWidth / 2,
         y = WinHeight * 0.75,
-        time_since_hit = 999
+        time_since_hit = 999,
+        colour = { r = 1, g = 0.64, b = 0 }
     }
     HiTomDrum = {
         name = "hitom",
         x = WinWidth / 7,
         y = WinHeight * 0.4,
-        time_since_hit = 999
+        time_since_hit = 999,
+        colour = { r = 0.6, g = 0.6, b = 0 }
     }
     LoTomDrum = {
         name = "lotom",
         x = WinWidth - WinWidth / 7,
         y = WinHeight * 0.4,
-        time_since_hit = 999
+        time_since_hit = 999,
+        colour = { r = 1, g = 1, b = 0 }
     }
     OpenHiHatDrum = {
         name = "ohihat",
         x = WinWidth / 5,
         y = WinHeight * 0.4,
-        time_since_hit = 999
+        time_since_hit = 999,
+        colour = { r = 0, g = 0.6, b = 0 }
     }
     ClosedHiHatDrum = {
         name = "chihat",
         x = WinWidth - WinWidth / 5,
         y = WinHeight * 0.4,
-        time_since_hit = 999
+        time_since_hit = 999,
+        colour = { r = 0, g = 1, b = 0 }
     }
     CrashDrum = {
         name = "crash",
         x = WinWidth / 2,
         y = WinHeight * 0.8,
-        time_since_hit = 999
+        time_since_hit = 999,
+        colour = { r = 1, g = 0, b = 1 }
     }
+    DrumsByIndex = {}
+    DrumsByIndex[BASS] = BassDrum
+    DrumsByIndex[SNARE] = SnareDrum
+    DrumsByIndex[HITOM] = HiTomDrum
+    DrumsByIndex[LOTOM] = LoTomDrum
+    DrumsByIndex[OHIHAT] = OpenHiHatDrum
+    DrumsByIndex[CHIHAT] = ClosedHiHatDrum
+    DrumsByIndex[CRASH] = CrashDrum
 end
 
 function ResumeCoroutine(co, dt)
@@ -553,17 +568,17 @@ function DrawGrid()
                 x = cell_x * CellWidth,
                 y = cell_y * CellHeight + GridTopLeftY
             }
-            local bg_colour = { red = 0, green = 0, blue = 0 }
-            local fg_colour = { red = 1, green = 1, blue = 1 }
+            local bg_colour = { r = 0, g = 0, b = 0 }
+            local fg_colour = { r = 1, g = 1, b = 1 }
             local cell = BeatGrid[cell_x][cell_y]
             if cell.hover then
-                bg_colour = { red = 0.3, green = 0.3, blue = 0.3 }
+                bg_colour = { r = 0.3, g = 0.3, b = 0.3 }
             elseif cell.on
             then
-                bg_colour = { red = 0, green = 0.8, blue = 0.7 }
+                bg_colour = DrumsByIndex[cell_y].colour
             end
             -- background for the cell
-            love.graphics.setColor(bg_colour.red, bg_colour.green, bg_colour.blue, 1)
+            love.graphics.setColor(bg_colour.r, bg_colour.g, bg_colour.b, 1)
             love.graphics.rectangle(
                 "fill",
                 top_left.x,
@@ -572,7 +587,7 @@ function DrawGrid()
                 CellHeight
             )
             -- outline for the cell
-            love.graphics.setColor(fg_colour.red, fg_colour.green, fg_colour.blue, 1)
+            love.graphics.setColor(fg_colour.r, fg_colour.g, fg_colour.b, 1)
             love.graphics.rectangle(
                 "line",
                 top_left.x,
@@ -622,7 +637,8 @@ function DrawBassDrumEffect()
     if diminish_factor < 0 then
         return
     end
-    love.graphics.setColor(1, 0, 0, diminish_factor)
+    love.graphics.setColor(
+        BassDrum.colour.r, BassDrum.colour.g, BassDrum.colour.b, diminish_factor)
     love.graphics.circle(
         "fill",
         BassDrum.x,
@@ -640,7 +656,8 @@ function DrawSnareDrumEffect()
     if diminish_factor < 0 then
         return
     end
-    love.graphics.setColor(1, 0.64, 0, diminish_factor)
+    love.graphics.setColor(
+        SnareDrum.colour.r, SnareDrum.colour.g, SnareDrum.colour.b, diminish_factor)
     love.graphics.circle(
         "fill",
         Objects.snare.body:getX(),
@@ -655,7 +672,8 @@ function DrawLeftTomDrumEffect()
     if diminish_factor < 0 then
         return
     end
-    love.graphics.setColor(1, 1, 0, diminish_factor)
+    love.graphics.setColor(
+        HiTomDrum.colour.r, HiTomDrum.colour.g, HiTomDrum.colour.b, diminish_factor)
     local bar_width = SideWallWidth * 2 + (1 - diminish_factor) * WinWidth * 0.4
     love.graphics.rectangle(
         "fill",
@@ -672,7 +690,8 @@ function DrawRightTomDrumEffect(drum)
     if diminish_factor < 0 then
         return
     end
-    love.graphics.setColor(1, 1, 0, diminish_factor)
+    love.graphics.setColor(
+        LoTomDrum.colour.r, LoTomDrum.colour.g, LoTomDrum.colour.b, diminish_factor)
     local bar_width = SideWallWidth * 2 + (1 - diminish_factor) * WinWidth * 0.4
     love.graphics.rectangle(
         "fill",
@@ -684,12 +703,15 @@ function DrawRightTomDrumEffect(drum)
 end
 
 function DrawHiHats()
-    love.graphics.setColor(0, 1, 0, 1)
+    love.graphics.setColor(
+        OpenHiHatDrum.colour.r, OpenHiHatDrum.colour.g, OpenHiHatDrum.colour.b, 1)
     love.graphics.polygon(
         "fill",
         Objects.left_hihat.body:getWorldPoints(
             Objects.left_hihat.shape:getPoints())
     )
+    love.graphics.setColor(
+        ClosedHiHatDrum.colour.r, ClosedHiHatDrum.colour.g, ClosedHiHatDrum.colour.b, 1)
     love.graphics.polygon(
         "fill",
         Objects.right_hihat.body:getWorldPoints(
