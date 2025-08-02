@@ -20,14 +20,11 @@ CRASH = 6
 BeatGrid = {}
 BeatAudio = {}
 
-TargetScores = {
-    1000,
-    2000,
-    4000,
-    8000,
-    16000,
-    32000,
-    64000
+Levels = {
+    { target = 1000, instruments = { 1, 0, 1, 0, 0, 0, 0 } },
+    { target = 2000, instruments = { 1, 0, 1, 0, 1, 0, 0 } },
+    { target = 4000, instruments = { 2, 0, 1, 1, 1, 1, 0 } },
+    { target = 8000, instruments = { 2, 2, 1, 1, 2, 2, 0 } }
 }
 
 function LogNums(text, ...)
@@ -58,7 +55,7 @@ end
 
 function InitGlobals()
     Time = 0
-    RemainingBalls = 0
+    RemainingBalls = 25
     Score = 0
     Level = 1
     RestartButtonHover = false
@@ -348,13 +345,27 @@ function HandleBeatGridMouseHover()
     end
 end
 
+function GetAmountOfOnCellsForInstr(instr)
+    local amount = 0
+    for cell_x = 0, NumBeats do
+        if BeatGrid[cell_x][instr].on then
+            amount = amount + 1
+        end
+    end
+    return amount
+end
+
 function HandleBeatGridMouseClick(mouse_x, mouse_y)
     local cell_x, cell_y, mouse_in_grid = MouseCoordToGridCoord(mouse_x, mouse_y)
     if mouse_in_grid then
         local is_on = BeatGrid[cell_x][cell_y].on
         if is_on then
             BeatGrid[cell_x][cell_y].on = false
-        else
+            return
+        end
+        local amount_on = GetAmountOfOnCellsForInstr(cell_y)
+        LogNums("%d %d %d", amount_on, Level, cell_y)
+        if amount_on < Levels[Level].instruments[cell_y+1] then
             BeatGrid[cell_x][cell_y].on = true
         end
     end
@@ -848,7 +859,7 @@ function DrawHud()
     )
     -- show current level
     love.graphics.print(
-        string.format("%d/%d  LEVEL", Level, #TargetScores),
+        string.format("%d/%d  LEVEL", Level, #Levels),
         20,
         10 + 5 + HudFont:getHeight()
     )
@@ -860,7 +871,7 @@ function DrawHud()
         10
     )
     -- show target score
-    local target_hud = string.format("TARGET %06d", TargetScores[Level])
+    local target_hud = string.format("TARGET %06d", Levels[Level].target)
     love.graphics.print(
         target_hud,
         WinWidth - 20 - HudFont:getWidth(target_hud),
