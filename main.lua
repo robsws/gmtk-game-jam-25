@@ -21,10 +21,12 @@ BeatGrid = {}
 BeatAudio = {}
 
 Levels = {
-    { target = 500, instruments = { 1, 0, 1, 0, 0, 0, 0 } },
-    { target = 2000, instruments = { 1, 0, 1, 0, 1, 0, 0 } },
-    { target = 4000, instruments = { 2, 0, 1, 1, 1, 1, 0 } },
-    { target = 8000, instruments = { 2, 2, 1, 1, 2, 2, 0 } }
+    { target =  500, instruments = { 1, 0, 1, 1, 0, 0, 0 } },
+    { target = 1000, instruments = { 1, 1, 1, 1, 1, 1, 0 } },
+    { target = 1500, instruments = { 2, 2, 2, 2, 2, 2, 0 } },
+    { target = 2000, instruments = { 3, 3, 3, 3, 4, 4, 0 } },
+    { target = 2500, instruments = { 4, 4, 4, 4, 6, 6, 0 } },
+    { target = 999999, instruments = { 6, 6, 8, 8, 12, 12, 1}}
 }
 
 function LogNums(text, ...)
@@ -60,6 +62,7 @@ function InitGlobals()
     Level = 1
     RestartButtonHover = false
     TimeSinceLevelUp = 999
+    HiScore = 0
 end
 
 function InitDrums()
@@ -387,7 +390,7 @@ function MouseIsOverRestartButton()
     local button_top_left_x =
         WinWidth / 2 - HudFont:getWidth(restart_text) / 2 - ButtonPadding
     local button_top_left_y =
-        WinHeight / 2 + EndScreenFont:getHeight()
+        WinHeight / 3 + EndScreenFont:getHeight()
     local button_width =
         2 * ButtonPadding + HudFont:getWidth(restart_text)
     local button_height =
@@ -435,6 +438,9 @@ function UpdateScore(dt)
     if Objects.ball then
         Score = Score + 50 * dt
     end
+	if Score > HiScore then
+		HiScore = Score
+	end
     if Score > Levels[Level].target then
         -- level up
         Level = Level + 1
@@ -629,13 +635,11 @@ function HandleDrumTrigger(dt)
         ActivateDrum(SnareDrum)
     end
     if instruments[HITOM].on then
-        print("hitom")
         BeatAudio.hitom:stop()
         BeatAudio.hitom:play()
         ActivateDrum(HiTomDrum)
     end
     if instruments[LOTOM].on then
-        print("lotom")
         BeatAudio.lotom:stop()
         BeatAudio.lotom:play()
         ActivateDrum(LoTomDrum)
@@ -925,11 +929,21 @@ function DrawGameOver()
         WinHeight
     )
     love.graphics.setColor(1, 0, 0, 1)
-    local game_over_text = "NO CREDITS"
+    local game_over_text = "NO CREDITS REMAINING"
     love.graphics.print(
         game_over_text,
         WinWidth / 2 - EndScreenFont:getWidth(game_over_text) / 2,
-        WinHeight / 2 - EndScreenFont:getHeight() / 2
+        WinHeight / 3 - EndScreenFont:getHeight() / 2
+    )
+
+    --display hiscore
+    love.graphics.setColor(0, 1, 0, 1)
+	love.graphics.setFont(HudFont)
+    local hi_score_text = string.format("HISCORE: %d", HiScore)
+	love.graphics.print(
+        hi_score_text,
+        WinWidth / 2 - HudFont:getWidth(hi_score_text) / 2,
+        (WinHeight / 4 * 3) - HudFont:getHeight() / 2
     )
 end
 
@@ -941,11 +955,10 @@ function DrawRestartButton()
     end
     love.graphics.setFont(HudFont)
     local restart_text = "INSERT COIN"
-    local ButtonPadding = 20
     love.graphics.rectangle(
         "fill",
         WinWidth / 2 - HudFont:getWidth(restart_text) / 2 - ButtonPadding,
-        WinHeight / 2 + EndScreenFont:getHeight(),
+        WinHeight / 3 + EndScreenFont:getHeight(),
         2 * ButtonPadding + HudFont:getWidth(restart_text),
         2 * ButtonPadding + HudFont:getHeight()
     )
@@ -957,7 +970,7 @@ function DrawRestartButton()
     love.graphics.print(
         restart_text,
         WinWidth / 2 - HudFont:getWidth(restart_text) / 2,
-        WinHeight / 2 + EndScreenFont:getHeight() + ButtonPadding
+        WinHeight / 3 + EndScreenFont:getHeight() + ButtonPadding
     )
 end
 
@@ -979,7 +992,6 @@ function DrawGridTickerForInstr(instr)
     local secs_to_cross_screen = NumBeats / TempoBps
     local time_percent = (Time % secs_to_cross_screen) / secs_to_cross_screen
     local cell_height
-    print(full_ticker_text)
     love.graphics.print(
         full_ticker_text,
         -ticker_text_width * time_percent,
@@ -1007,10 +1019,14 @@ function DrawLevelUp()
     love.graphics.setColor(colour.r, colour.g, colour.b, diminish_factor)
     love.graphics.setFont(EndScreenFont)
     local text = "LEVEL UP!"
+    if Level == #Levels then
+        text = "YOU WIN! GO FOR HISCORE!"
+		RemainingBalls = 0
+    end
     local text_height = EndScreenFont:getHeight()
     local text_width = EndScreenFont:getWidth(text)
     love.graphics.print(
-        "LEVEL UP!",
+        text,
         WinWidth / 2 - text_width / 2,
         WinHeight * 0.3 - text_height / 2
     )
