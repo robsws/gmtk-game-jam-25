@@ -19,6 +19,19 @@ CRASH = 6
 BeatGrid = {}
 Time = 0
 BeatAudio = {}
+RemainingBalls = 20
+Score = 0
+Level = 1
+
+TargetScores = {
+    1000,
+    2000,
+    4000,
+    8000,
+    16000,
+    32000,
+    64000
+}
 
 function LogNums(text, ...)
     print(string.format(text, ...))
@@ -141,6 +154,9 @@ function LoadAssets()
         chihat = love.audio.newSource("assets/audio/hihat-plain.wav", "static"),
         crash = love.audio.newSource("assets/audio/crash-acoustic.wav", "static")
     }
+    HudFont = love.graphics.newFont(
+        "assets/fonts/Kenney Rocket Square.ttf", 16)
+    love.graphics.setFont(HudFont)
 end
 
 function InitPhysics()
@@ -350,6 +366,7 @@ function UpdateBall(dt)
             this_frame_beat == 0
         ) then
         InitBall()
+        RemainingBalls = RemainingBalls - 1
     end
     if not(Objects.ball) then return end
     -- if the ball drops off the bottom, destroy it
@@ -787,6 +804,36 @@ function DrawCrashDrumEffect()
     )
 end
 
+function DrawHud()
+    love.graphics.setColor(0.3, 0, 0, 1)
+    -- show remaining balls
+    love.graphics.print(
+        string.format("%06d  credits", RemainingBalls),
+        20,
+        10
+    )
+    -- show current level
+    love.graphics.print(
+        string.format("%d/%d  level", Level, #TargetScores),
+        20,
+        10 + 5 + HudFont:getHeight()
+    )
+    -- show current score
+    local score_hud = string.format("score  %06d", Score)
+    love.graphics.print(
+        score_hud,
+        WinWidth - 20 - HudFont:getWidth(score_hud),
+        10
+    )
+    -- show target score
+    local target_hud = string.format("target %06d", TargetScores[Level])
+    love.graphics.print(
+        target_hud,
+        WinWidth - 20 - HudFont:getWidth(target_hud),
+        10 + 5 + HudFont:getHeight()
+    )
+end
+
 -- CALLBACKS
 
 function love.load()
@@ -820,6 +867,7 @@ function love.draw()
     DrawCrashDrumEffect()
     DrawWalls()
     DrawHiHats()
+    DrawHud()
 end
 
 function love.mousereleased(x, y, button, istouch, presses)
