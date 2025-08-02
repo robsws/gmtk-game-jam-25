@@ -1044,6 +1044,7 @@ end
 function love.load()
     LoadAssets()
     love.window.setMode(650, 1000)
+	love.window.setTitle("Don't Drop The Beat")
     ResetWindowGlobals()
     InitGlobals()
     InitDrums()
