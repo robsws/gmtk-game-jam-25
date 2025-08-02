@@ -21,7 +21,7 @@ BeatGrid = {}
 BeatAudio = {}
 
 Levels = {
-    { target = 1000, instruments = { 1, 0, 1, 0, 0, 0, 0 } },
+    { target = 500, instruments = { 1, 0, 1, 0, 0, 0, 0 } },
     { target = 2000, instruments = { 1, 0, 1, 0, 1, 0, 0 } },
     { target = 4000, instruments = { 2, 0, 1, 1, 1, 1, 0 } },
     { target = 8000, instruments = { 2, 2, 1, 1, 2, 2, 0 } }
@@ -59,6 +59,7 @@ function InitGlobals()
     Score = 0
     Level = 1
     RestartButtonHover = false
+    TimeSinceLevelUp = 999
 end
 
 function InitDrums()
@@ -415,7 +416,7 @@ function UpdateBall(dt)
         InitBall()
         RemainingBalls = RemainingBalls - 1
     end
-    if not(Objects.ball) then return end
+    if not (Objects.ball) then return end
     -- if the ball drops off the bottom, destroy it
     if (
             Objects.ball.body:getY() > WinHeight * 0.8 or
@@ -430,8 +431,15 @@ function UpdateBall(dt)
 end
 
 function UpdateScore(dt)
+    TimeSinceLevelUp = TimeSinceLevelUp + dt
     if Objects.ball then
         Score = Score + 50 * dt
+    end
+    if Score > Levels[Level].target then
+        -- level up
+        Level = Level + 1
+        TimeSinceLevelUp = 0
+        CrashDrum.time_since_hit = 0
     end
 end
 
@@ -989,6 +997,25 @@ function DrawGridTicker()
     end
 end
 
+function DrawLevelUp()
+    local max_time = (NumBeats / TempoBps) / (NumBeats / 8) -- 8 beats
+    local diminish_factor = (max_time - TimeSinceLevelUp) / max_time
+    if diminish_factor < 0 then
+        return
+    end
+    local colour = RainbowCycle((diminish_factor * 2) % 1)
+    love.graphics.setColor(colour.r, colour.g, colour.b, diminish_factor)
+    love.graphics.setFont(EndScreenFont)
+    local text = "LEVEL UP!"
+    local text_height = EndScreenFont:getHeight()
+    local text_width = EndScreenFont:getWidth(text)
+    love.graphics.print(
+        "LEVEL UP!",
+        WinWidth / 2 - text_width / 2,
+        WinHeight * 0.3 - text_height / 2
+    )
+end
+
 -- CALLBACKS
 
 function love.load()
@@ -1038,6 +1065,7 @@ function love.draw()
     DrawGrid()
     DrawTimeBar()
     DrawHud()
+    DrawLevelUp()
 end
 
 function love.mousereleased(x, y, button, istouch, presses)
