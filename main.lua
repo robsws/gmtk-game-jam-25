@@ -64,6 +64,7 @@ end
 function InitDrums()
     BassDrum = {
         name = "bass",
+        display_name = "KICK",
         x = WinWidth / 2,
         y = WinHeight * 0.75,
         time_since_hit = 999,
@@ -71,6 +72,7 @@ function InitDrums()
     }
     SnareDrum = {
         name = "snare",
+        display_name = "SNARE",
         x = WinWidth / 2,
         y = WinHeight * 0.75,
         time_since_hit = 999,
@@ -78,6 +80,7 @@ function InitDrums()
     }
     HiTomDrum = {
         name = "hitom",
+        display_name = "L-TOM",
         x = WinWidth / 7,
         y = WinHeight * 0.4,
         time_since_hit = 999,
@@ -85,6 +88,7 @@ function InitDrums()
     }
     LoTomDrum = {
         name = "lotom",
+        display_name = "R-TOM",
         x = WinWidth - WinWidth / 7,
         y = WinHeight * 0.4,
         time_since_hit = 999,
@@ -92,6 +96,7 @@ function InitDrums()
     }
     OpenHiHatDrum = {
         name = "ohihat",
+        display_name = "L-HIHAT",
         x = WinWidth / 5,
         y = WinHeight * 0.4,
         time_since_hit = 999,
@@ -99,6 +104,7 @@ function InitDrums()
     }
     ClosedHiHatDrum = {
         name = "chihat",
+        display_name = "R-HIHAT",
         x = WinWidth - WinWidth / 5,
         y = WinHeight * 0.4,
         time_since_hit = 999,
@@ -106,6 +112,7 @@ function InitDrums()
     }
     CrashDrum = {
         name = "crash",
+        display_name = "CRASH",
         x = WinWidth / 2,
         y = WinHeight * 0.8,
         time_since_hit = 999,
@@ -158,6 +165,8 @@ function LoadAssets()
     }
     HudFont = love.graphics.newFont(
         "assets/fonts/Kenney Rocket Square.ttf", 16)
+    GridTickerFont = love.graphics.newFont(
+        "assets/fonts/Kenney Rocket Square.ttf", 14)
     EndScreenFont = love.graphics.newFont(
         "assets/fonts/Kenney Rocket Square.ttf", 32)
     love.graphics.setFont(HudFont)
@@ -641,23 +650,31 @@ function HandleDrumTrigger(dt)
 end
 
 function DrawGrid()
+    -- draw background
+    love.graphics.setColor(0, 0, 0, 1)
+    love.graphics.rectangle(
+        "fill", 0, WinHeight*0.8, WinWidth, WinHeight*0.2
+    )
+    -- draw tickers
+    DrawGridTicker()
+    -- draw hover/selected cells
     for cell_y = 0, NumCellsY do
         for cell_x = 0, NumCellsX do
             local top_left = {
                 x = cell_x * CellWidth,
                 y = cell_y * CellHeight + GridTopLeftY
             }
-            local bg_colour = { r = 0, g = 0, b = 0 }
-            local fg_colour = { r = 1, g = 1, b = 1 }
+            local bg_colour = { r = 0, g = 0, b = 0, a = 0 }
             local cell = BeatGrid[cell_x][cell_y]
             if cell.hover then
-                bg_colour = { r = 0.3, g = 0.3, b = 0.3 }
+                bg_colour = { r = 0.3, g = 0.3, b = 0.3, a = 1 }
             elseif cell.on
             then
                 bg_colour = DrumsByIndex[cell_y].colour
+                bg_colour.a = 1
             end
             -- background for the cell
-            love.graphics.setColor(bg_colour.r, bg_colour.g, bg_colour.b, 1)
+            love.graphics.setColor(bg_colour.r, bg_colour.g, bg_colour.b, bg_colour.a)
             love.graphics.rectangle(
                 "fill",
                 top_left.x,
@@ -665,8 +682,18 @@ function DrawGrid()
                 CellWidth,
                 CellHeight
             )
+        end
+    end
+    -- draw grid lines
+    local fg_colour = { r = 1, g = 1, b = 1, a = 1 }
+    for cell_y = 0, NumCellsY do
+        for cell_x = 0, NumCellsX do
+            local top_left = {
+                x = cell_x * CellWidth,
+                y = cell_y * CellHeight + GridTopLeftY
+            }
             -- outline for the cell
-            love.graphics.setColor(fg_colour.r, fg_colour.g, fg_colour.b, 1)
+            love.graphics.setColor(fg_colour.r, fg_colour.g, fg_colour.b, fg_colour.a)
             love.graphics.rectangle(
                 "line",
                 top_left.x,
@@ -926,6 +953,42 @@ function DrawRestartButton()
     )
 end
 
+function DrawGridTickerForInstr(instr)
+    local drum = DrumsByIndex[instr]
+    local activations = GetAmountOfOnCellsForInstr(instr)
+    local remaining = Levels[Level].instruments[instr+1] - activations
+    if remaining == 0 then
+        love.graphics.setColor(0.3, 0.3, 0.3, 1)
+    else
+        love.graphics.setColor(0.2, 0.2, 0.6, 1)
+    end
+    local ticker_text = string.format(
+        "%s - %d - ", drum.display_name, remaining)
+    local ticker_text_width = GridTickerFont:getWidth(ticker_text)
+    local amount_of_repeats_needed = math.ceil(WinWidth / ticker_text_width)
+    local full_ticker_text = string.rep(ticker_text, amount_of_repeats_needed + 2)
+    -- track the text across the screen
+    local secs_to_cross_screen = NumBeats / TempoBps
+    local time_percent = (Time % secs_to_cross_screen) / secs_to_cross_screen
+    local cell_height
+    print(full_ticker_text)
+    love.graphics.print(
+        full_ticker_text,
+        -ticker_text_width * time_percent,
+        WinHeight * 0.8 +
+        CellHeight / 2 +
+        (CellHeight * instr) -
+        (CellHeight / 2 - GridTickerFont:getHeight() / 2)
+    )
+end
+
+function DrawGridTicker()
+    love.graphics.setFont(GridTickerFont)
+    for instr = 0, NumInstruments - 1 do
+        DrawGridTickerForInstr(instr)
+    end
+end
+
 -- CALLBACKS
 
 function love.load()
@@ -964,8 +1027,6 @@ function love.draw()
         DrawRestartButton()
         return
     end
-    DrawGrid()
-    DrawTimeBar()
     DrawBall()
     DrawBassDrumEffect()
     DrawSnareDrumEffect()
@@ -974,6 +1035,8 @@ function love.draw()
     DrawCrashDrumEffect()
     DrawWalls()
     DrawHiHats()
+    DrawGrid()
+    DrawTimeBar()
     DrawHud()
 end
 
