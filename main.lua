@@ -188,7 +188,7 @@ end
 
 function InitBall()
     Objects.ball = {}
-    Objects.ball.body = love.physics.newBody(World, WinWidth / 2, 0, "dynamic")
+    Objects.ball.body = love.physics.newBody(World, WinWidth / 2, 11, "dynamic")
     Objects.ball.shape = love.physics.newCircleShape(10)
     -- fixtures attach shapes to bodies.
     Objects.ball.fixture = love.physics.newFixture(Objects.ball.body, Objects.ball.shape, 1)
@@ -291,6 +291,13 @@ function InitWalls()
             WinWidth - SideWallWidth, WinHeight * 0.8 - BotWallHeight,
             WinWidth - SideWallWidth, WinHeight * 0.8 - 3 * BotWallHeight,
             WinWidth - BotWallWidth, WinHeight * 0.8 - BotWallHeight))
+    -- wall to prevent ball going out of the top
+    table.insert(
+        Objects.walls,
+        InitRectangleWall(
+			0, 0, WinWidth, 1
+		)
+	)
 end
 
 function InitRectangleWall(x, y, w, h)
