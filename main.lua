@@ -337,8 +337,22 @@ function HandleBeatGridMouseClick(mouse_x, mouse_y)
     end
 end
 
-function UpdateBall()
-    -- if the ball drops off the bottom, put it back at the top
+function UpdateBall(dt)
+    -- if there's no ball, create it on the first beat of the bar
+    local secs_to_cross_screen = NumBeats / TempoBps
+    local time_bar_percent_this_frame = (Time % secs_to_cross_screen) / secs_to_cross_screen
+    local time_bar_percent_last_frame = ((Time - dt) % secs_to_cross_screen) / secs_to_cross_screen
+    local this_frame_beat = math.floor(time_bar_percent_this_frame * NumBeats)
+    local last_frame_beat = math.floor(time_bar_percent_last_frame * NumBeats)
+    if (
+            not Objects.ball and
+            this_frame_beat ~= last_frame_beat and
+            this_frame_beat == 0
+        ) then
+        InitBall()
+    end
+    if not(Objects.ball) then return end
+    -- if the ball drops off the bottom, destroy it
     if (
             Objects.ball.body:getY() > WinHeight * 0.8 or
             Objects.ball.body:getY() < 0 or
@@ -346,7 +360,7 @@ function UpdateBall()
             Objects.ball.body:getX() > WinWidth
         ) then
         DestroyPhysicsObject(Objects.ball)
-        InitBall()
+        Objects.ball = nil
     end
 end
 
@@ -487,6 +501,9 @@ end
 
 function ActivateDrum(drum)
     drum.time_since_hit = 0
+    if not(Objects.ball) then
+        return
+    end
     if drum.name == "bass" then
         ApplyBassDrumForce(drum.x, drum.y)
     elseif drum.name == "lotom" or drum.name == "hitom" then
@@ -612,6 +629,9 @@ function DrawTimeBar()
 end
 
 function DrawBall()
+    if not(Objects.ball) then
+        return
+    end
     love.graphics.setColor(0, 0, 1)
     love.graphics.circle(
         "fill",
@@ -755,13 +775,13 @@ function DrawCrashDrumEffect()
     if diminish_factor < 0 then
         return
     end
-    local colour = RainbowCycle((diminish_factor*2) % 1)
-    love.graphics.setColor(colour.r/2, colour.g/2, colour.b/2, diminish_factor)
+    local colour = RainbowCycle((diminish_factor * 2) % 1)
+    love.graphics.setColor(colour.r / 2, colour.g / 2, colour.b / 2, diminish_factor)
     local bar_height = BotWallHeight * 2 + (1 - diminish_factor) * WinHeight * 0.5
     love.graphics.rectangle(
         "fill",
         0,
-        WinHeight*0.8 - bar_height,
+        WinHeight * 0.8 - bar_height,
         WinWidth,
         bar_height
     )
@@ -786,7 +806,7 @@ function love.update(dt)
     UpdateDrums(dt)
     HandleDrumTrigger(dt)
     World:update(dt)
-    UpdateBall()
+    UpdateBall(dt)
 end
 
 function love.draw()
