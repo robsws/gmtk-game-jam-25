@@ -5,6 +5,7 @@ NumInstruments = 7
 NumCellsX = NumBeats
 NumCellsY = NumInstruments
 TempoBps = 8
+ButtonPadding = 20
 
 BASS = 0
 SNARE = 1
@@ -17,11 +18,7 @@ CRASH = 6
 -- GLOBALS
 
 BeatGrid = {}
-Time = 0
 BeatAudio = {}
-RemainingBalls = 20
-Score = 0
-Level = 1
 
 TargetScores = {
     1000,
@@ -57,6 +54,14 @@ function ResetWindowGlobals()
     TopWallWidth = WinWidth / 2 - 20
     BotWallHeight = 50
     BotWallWidth = WinWidth / 2 - 80
+end
+
+function InitGlobals()
+    Time = 0
+    RemainingBalls = 0
+    Score = 0
+    Level = 1
+    RestartButtonHover = false
 end
 
 function InitDrums()
@@ -156,6 +161,8 @@ function LoadAssets()
     }
     HudFont = love.graphics.newFont(
         "assets/fonts/Kenney Rocket Square.ttf", 16)
+    EndScreenFont = love.graphics.newFont(
+        "assets/fonts/Kenney Rocket Square.ttf", 32)
     love.graphics.setFont(HudFont)
 end
 
@@ -353,6 +360,26 @@ function HandleBeatGridMouseClick(mouse_x, mouse_y)
     end
 end
 
+function MouseIsOverRestartButton()
+    local mouse_x, mouse_y = love.mouse.getPosition()
+    local restart_text = "INSERT COIN"
+    local button_top_left_x =
+        WinWidth / 2 - HudFont:getWidth(restart_text) / 2 - ButtonPadding
+    local button_top_left_y =
+        WinHeight / 2 + EndScreenFont:getHeight()
+    local button_width =
+        2 * ButtonPadding + HudFont:getWidth(restart_text)
+    local button_height =
+        2 * ButtonPadding + HudFont:getHeight()
+
+    return (
+        mouse_x >= button_top_left_x and
+        mouse_x <= button_top_left_x + button_width and
+        mouse_y >= button_top_left_y and
+        mouse_y <= button_top_left_y + button_height
+    )
+end
+
 function UpdateBall(dt)
     -- if there's no ball, create it on the first beat of the bar
     local secs_to_cross_screen = NumBeats / TempoBps
@@ -378,6 +405,13 @@ function UpdateBall(dt)
         ) then
         DestroyPhysicsObject(Objects.ball)
         Objects.ball = nil
+        Score = 0
+    end
+end
+
+function UpdateScore(dt)
+    if Objects.ball then
+        Score = Score + 50 * dt
     end
 end
 
@@ -808,29 +842,76 @@ function DrawHud()
     love.graphics.setColor(0.3, 0, 0, 1)
     -- show remaining balls
     love.graphics.print(
-        string.format("%06d  credits", RemainingBalls),
+        string.format("%06d  CREDITS", math.max(0, RemainingBalls)),
         20,
         10
     )
     -- show current level
     love.graphics.print(
-        string.format("%d/%d  level", Level, #TargetScores),
+        string.format("%d/%d  LEVEL", Level, #TargetScores),
         20,
         10 + 5 + HudFont:getHeight()
     )
     -- show current score
-    local score_hud = string.format("score  %06d", Score)
+    local score_hud = string.format("SCORE  %06d", Score)
     love.graphics.print(
         score_hud,
         WinWidth - 20 - HudFont:getWidth(score_hud),
         10
     )
     -- show target score
-    local target_hud = string.format("target %06d", TargetScores[Level])
+    local target_hud = string.format("TARGET %06d", TargetScores[Level])
     love.graphics.print(
         target_hud,
         WinWidth - 20 - HudFont:getWidth(target_hud),
         10 + 5 + HudFont:getHeight()
+    )
+end
+
+function DrawGameOver()
+    love.graphics.setColor(0.3, 0, 0, 0.8)
+    love.graphics.setFont(EndScreenFont)
+    love.graphics.rectangle(
+        "fill",
+        0,
+        0,
+        WinWidth,
+        WinHeight
+    )
+    love.graphics.setColor(1, 0, 0, 1)
+    local game_over_text = "NO CREDITS"
+    love.graphics.print(
+        game_over_text,
+        WinWidth / 2 - EndScreenFont:getWidth(game_over_text) / 2,
+        WinHeight / 2 - EndScreenFont:getHeight() / 2
+    )
+end
+
+function DrawRestartButton()
+    if RestartButtonHover then
+        love.graphics.setColor(0, 1, 1, 1)
+    else
+        love.graphics.setColor(0, 0.3, 0.3, 1)
+    end
+    love.graphics.setFont(HudFont)
+    local restart_text = "INSERT COIN"
+    local ButtonPadding = 20
+    love.graphics.rectangle(
+        "fill",
+        WinWidth / 2 - HudFont:getWidth(restart_text) / 2 - ButtonPadding,
+        WinHeight / 2 + EndScreenFont:getHeight(),
+        2 * ButtonPadding + HudFont:getWidth(restart_text),
+        2 * ButtonPadding + HudFont:getHeight()
+    )
+    if RestartButtonHover then
+        love.graphics.setColor(0, 0.3, 0.3, 1)
+    else
+        love.graphics.setColor(0, 1, 1, 1)
+    end
+    love.graphics.print(
+        restart_text,
+        WinWidth / 2 - HudFont:getWidth(restart_text) / 2,
+        WinHeight / 2 + EndScreenFont:getHeight() + ButtonPadding
     )
 end
 
@@ -840,12 +921,21 @@ function love.load()
     LoadAssets()
     love.window.setMode(650, 1000)
     ResetWindowGlobals()
+    InitGlobals()
     InitDrums()
     InitBeatGrid()
     InitPhysics()
 end
 
 function love.update(dt)
+    if RemainingBalls < 0 then
+        if MouseIsOverRestartButton() then
+            RestartButtonHover = true
+        else
+            RestartButtonHover = false
+        end
+        return
+    end
     ResetWindowGlobals()
     ClearBeatGridHoverState()
     HandleBeatGridMouseHover()
@@ -854,9 +944,15 @@ function love.update(dt)
     HandleDrumTrigger(dt)
     World:update(dt)
     UpdateBall(dt)
+    UpdateScore(dt)
 end
 
 function love.draw()
+    if RemainingBalls < 0 then
+        DrawGameOver()
+        DrawRestartButton()
+        return
+    end
     DrawGrid()
     DrawTimeBar()
     DrawBall()
@@ -871,5 +967,11 @@ function love.draw()
 end
 
 function love.mousereleased(x, y, button, istouch, presses)
-    HandleBeatGridMouseClick(x, y)
+    if RemainingBalls < 0 then
+        if MouseIsOverRestartButton() then
+            love.load()
+        end
+    else
+        HandleBeatGridMouseClick(x, y)
+    end
 end
